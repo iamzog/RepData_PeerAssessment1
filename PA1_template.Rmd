@@ -1,25 +1,99 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+author: "Paul Hartzog"
+output: html_document
+keep_md: true
 ---
 
+###Loading and preprocessing the data
 
-## Loading and preprocessing the data
+Read in the .csv file for the dataset and make sure date is set as.Date
+```{r load data, results=FALSE}
+setwd("E:/Users/Paul/Desktop/Reproducible research/Course Project 1/repdata_data_activity/")
+data<-read.csv("activity.csv")
+data$date <-as.Date(data$date)
+```
 
+###What is mean total number of steps taken per day?
 
+Histogram of the total number of steps taken each day. Load the plyr package to use ddply.
+```{r histogram}
+library(plyr)
+tot.steps<-ddply(data, .(date), summarise, total=sum(steps, na.rm=TRUE))
+hist(tot.steps$total, main="Histogram of Total Steps", xlab="Total Steps")
+```
 
-## What is mean total number of steps taken per day?
+Mean and median number of steps each day.
+```{r means}
+ddply(data, .(date), summarise, mean=mean(steps, na.rm=TRUE))
+ddply(data, .(date), summarise, median=median(steps, na.rm=TRUE))
+```
 
+###What is the average daily activity pattern?
 
+Daily activity pattern. 
+```{r 5 min intervals}
+inter<-ddply(data, .(interval), summarise, mean=mean(steps, na.rm=TRUE))
+plot(inter$interval, inter$mean, type="l", main="Mean Number of Steps for Each Interval", ylab="Mean", xlab="Interval")
+```
 
-## What is the average daily activity pattern?
+Interval with the average max number of steps
+```{r max}
+inter[which.max(inter$mean),1]
+```
 
+###Inputting missing values
 
+Calculation of the total number of values missing from the data
+```{r total}
+data2<-data[!is.na(data$steps),]
+nrow(data)-nrow(data2)
+```
+Creating new dataset with the missing values filled. I used 0 because it was the median for every day.
+```{r fill}
+data.nona<-data
+data.nona$steps[is.na(data.nona$steps)]<-0
+```
+Recreating the histogram with missing values filled
+```{r full hist}
+tot.steps.nn<-ddply(data.nona, .(date), summarise, total=sum(steps, na.rm=TRUE))
+hist(tot.steps.nn$total, main="Histogram of Total Steps", xlab="Total Steps")
+```
 
-## Imputing missing values
+Recalculate the mean and median for each day and compare to orginal with NAs removed
+```{r full mean med}
+means_old<-ddply(data, .(date), summarise, mean=mean(steps, na.rm=TRUE))
+medians_old<-ddply(data, .(date), summarise, median=median(steps, na.rm=TRUE))
+means_nn<-ddply(data.nona, .(date), summarise, mean=mean(steps, na.rm=TRUE))
+medians_nn<-ddply(data.nona, .(date), summarise, median=median(steps, na.rm=TRUE))
+means_nn<-cbind(means_nn, means_old[,2])
+colnames(means_nn)<-c("date", "mean", "old mean")
+medians_nn<-cbind(medians_nn, medians_old[,2])
+colnames(medians_nn)<-c("date", "median", "old median")
+means_nn
+medians_nn
+```
+***Making all NAs equal to zero made some of the dates that previously had no data have mean and median of 0***
 
+###Are there differences in activity patterns between weekdays and weekends?
 
-
-## Are there differences in activity patterns between weekdays and weekends?
+First create a new column with the day of the week.
+```{r weekdays}
+data.nona$day<-weekdays(data$date)
+```
+Change each to a weekday or weekend
+```{r weekday or weekdn}
+data.nona$day<-gsub("Monday","Weekday", data.nona$day)
+data.nona$day<-gsub("Tuesday","Weekday", data.nona$day)
+data.nona$day<-gsub("Wednesday","Weekday", data.nona$day)
+data.nona$day<-gsub("Thursday","Weekday", data.nona$day)
+data.nona$day<-gsub("Friday","Weekday", data.nona$day)
+data.nona$day<-gsub("Saturday","Weekend", data.nona$day)
+data.nona$day<-gsub("Sunday","Weekend", data.nona$day)
+```
+Load lattice and create the panel plot that compares weekdays and weekends
+```{r weekday plot}
+library(lattice)
+inter.nona<-ddply(data.nona, .(interval, day), summarise, mean=mean(steps, na.rm=TRUE))
+xyplot(mean ~ interval|day, data=inter.nona, type="l", xlab="Interval", ylab="Mean Number of Steps")
+```
